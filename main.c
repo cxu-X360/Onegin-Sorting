@@ -23,7 +23,7 @@ enum COMPARES
 
 const int MAX_STRING_SIZE = 100;
 
-void print_str(char* string)
+void fprint_str(FILE* stream, char* string)
 {
 	assert(string);
 
@@ -31,9 +31,11 @@ void print_str(char* string)
 
 	while (string[i] != '\0' && string[i] != '\n' && string[i] != EOF)
 	{
-		putchar(string[i]);
+		fputc(string[i], stream);
 		i++;
 	}
+
+	fputc('\n', stream);
 }
 
 
@@ -89,15 +91,17 @@ int bubble_sort(void* array, size_t size, size_t size_el, int (*comparator)(void
 
 	} while (!is_final);
 
+	printf("bubble sort has been ended\n");
+
 	return 0;
 }
 
 
 
-int print_array_str(void* array, size_t size)
+int fprint_array_str(FILE* stream, void* array, size_t size)
 {
 	NULL_PTR_INP_ERROR(array);
-
+	NULL_FILE_ERROR(stream);
 	ZERO_SIZE_ERROR(size);
 
 	char** arr_str = (char** ) array; 
@@ -105,10 +109,9 @@ int print_array_str(void* array, size_t size)
 	for (int i = 0; i < size; ++i)
 	{
 		//printf("1) <%s> ", arr_str[i]);
-		print_str(arr_str[i]);
-		putchar('\n');
+		fprint_str(stream, arr_str[i]);
 	}
-	putchar('\n');
+	fputc('\n', stream);
 }
 
 int print_array_ptr(void* array, size_t size)
@@ -133,30 +136,26 @@ int text_beater1(char* text, char* string_pointers[])
 
 	while (text[pos] != '\0' && text[pos] != EOF)
 	{
-		printf("char in text in pos <%d> = <%c>\n", pos, text[pos]);
-
+		//printf("char in text in pos <%d> = <%c>\n", pos, text[pos]);
 		if (text[pos] == '\n')
 		{
-			
-
 			while (isspace(text[pos]) || (!isalpha(text[pos]) && text[pos] != '`'))
 			{
 				if (text[pos] == '\0')
 				{
 					return i + 1;
 				}
+
 				pos++;
 			}
 
 			i++;
 			string_pointers[i] = &text[pos];
 
-			printf("PTR added to the str_ptrs into i = %d\n", i);
+			//printf("PTR added to the str_ptrs into i = %d\n", i);
 		}
-
 		pos++;
 	}
-
 	return i + 1;
 }
 
@@ -229,22 +228,34 @@ int comp_alphabet_str(void* a_ptr, void* b_ptr)
 	if (tolower(b[i_b]) == '\0') return MORE;
 }
 
+int uint_comparator_up(void* a_ptr, void* b_ptr)
+{
+	size_t a = *((size_t*) a_ptr);
+	size_t b = *((size_t*) b_ptr);
+
+	if (a < b) return LESS;
+	if (a == b) return EQUAL;
+	if (a > b) return MORE;
+}
+
 int main()
 {
-	FILE* poem_file = fopen("Eugeny Onegin.txt", "r");
+	const char input_filename[] = "Eugeny Onegin.txt";
+	FILE* poem_file = fopen(input_filename, "r");
 	NULL_FILE_ERROR(poem_file);
 
 	char* text = (char*) malloc(sizeof(char));
 
 	size_t num_of_strings = 100;
-	char** string_pointers = (char**) calloc(num_of_strings, MAX_STRING_SIZE);
+	char** string_pointers = (char**) calloc(num_of_strings, 100);
 
-	num_of_strings = read_text("Eugeny Onegin.txt", poem_file, text, string_pointers);
+	num_of_strings = read_text(input_filename, poem_file, text, string_pointers);
+	fclose(poem_file);
 
 	printf("BEFORE CHANGING|||||||num_of_strings = <%d>\n------------------------------------------------------------------------\n", num_of_strings);
 
-	print_array_str(string_pointers, num_of_strings);
-	print_array_ptr(string_pointers, num_of_strings);
+	fprint_array_str(stdout, string_pointers, num_of_strings);
+	//print_array_ptr(string_pointers, num_of_strings);
 
 
 	bubble_sort(string_pointers, num_of_strings, sizeof(char*), comp_alphabet_str);
@@ -253,12 +264,46 @@ int main()
 	printf("AFTER CHANGING|||||||num_of_strings = <%d>\n------------------------------------------------------------------------\n", num_of_strings);
 
 
-	print_array_str(string_pointers, num_of_strings);
+	fprint_array_str(stdout, string_pointers, num_of_strings);
 	print_array_ptr(string_pointers, num_of_strings);
 
-	printf("hhaa\n");
+	printf("End of sorting\n");
+
+
+
+
+	const char out_file_name[] = "poem_out.txt"; 
+
+	FILE* out_file = fopen(out_file_name, "w");
+	NULL_FILE_ERROR(out_file);
+
+	fputs("----------------------------------------\n\n FIRST SORT \n\n", out_file);
+
+	fprint_array_str(out_file, string_pointers, num_of_strings);
+
+
+
+
+	fputs("----------------------------------------\n\n OLD FILE \n\n", out_file);
+
+	bubble_sort(string_pointers, num_of_strings, sizeof(char*), uint_comparator_up);
+	fprint_array_str(out_file, string_pointers, num_of_strings);
+
+
+	printf("printing old version has been ending\n");
+
+
+
+
+	fclose(out_file);
+
 
 	free(text);
 	free(string_pointers);
+
+	assert(0);
+
+	printf("ALL GOOD ENDING\n");
+	return 0;
 
 }
