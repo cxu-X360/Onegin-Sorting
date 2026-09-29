@@ -3,18 +3,17 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys\stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //МАКРОСЫ выдающие ошибки различные ошибки и останавливающие программу
-
-#define  NULL_PTR_INP_ERROR(arr) if (arr == NULL) do {fprintf(stderr, "NO array\n");return -1;} while(0)
+// TODO: use perrors
+#define  NULL_PTR_INP_ERROR(arr) if (arr == NULL) do {fprintf(stderr, "NO array\n");assert(0);} while(0)
 #define  ZERO_SIZE_ERROR(size) if (size == 0) do {fprintf(stderr, "ZERO size\n");return -2;} while(0)
 #define  NULL_FILE_ERROR(file) if (file == NULL) do {fprintf(stderr, "NULL file\n");return -3;} while(0)
-#define  NULL_FUNC_ERROR(func_ptr) if (func_ptr == 0) do {fprintf(stderr, "NULL func ptr\n");return -4;} while(0)
+#define  NULL_FUNC_ERROR(func_ptr) if (func_ptr == 0) do {fprintf(stderr, "NULL func ptr\n");assert(0);} while(0)
 #define  EMPTY_STRING_ERROR(str) if (strlen(str) == 0) do {fprintf(stderr, "EMPTY string YO\n");return -5;} while(0)
-
-//#define #DBG if (!debug) - TODO FIX
-
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //КОНСТАНТЫ и ГЛОБАЛЬНЫЕ переменные
@@ -77,19 +76,106 @@ int print_array_ptr(void* array, size_t size) // Вывод массива ук�
 	putchar('\n');
 }
 
+//----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+//ФУНКЦИИ для чтения текста
+
+
+int text_beater(char** text_ptr, char* string_pointers[]) //Разделение всего текста  на строки и занесение в массив указателей на строки string_pointers[]
+{
+	size_t pos = 0;
+
+	size_t i = 0;
+
+	char* text = *text_ptr;
+
+	string_pointers[0] = text;
+
+	while ((text)[pos] != '\0' && (text)[pos] != EOF) //Идем до конца текста
+	{
+		printf("char in text in pos <%d> = <%c>\n", pos, text[pos]);
+		if (text[pos] == '\n')
+		{
+			while (isspace((text)[pos]) || (!isalpha((text)[pos]) && (text)[pos] != '`'))
+			{
+				if ((text)[pos] == '\0')
+				{
+					return i + 1;
+				}
+
+				pos++;
+			}
+
+			i++;
+			string_pointers[i] = &(text[pos]);
+
+			printf("PTR added to the str_ptrs into i = %d\n", i);
+		}
+		pos++;
+	}
+	return i + 1;
+}
+
+
+int read_text(const char* filename, char** text, char* string_pointers[]) //Чтение текста  из исходного файла
+{
+	NULL_PTR_INP_ERROR(string_pointers);
+	EMPTY_STRING_ERROR(filename);
+
+	struct stat poem_info = {};
+
+	int file_descriptor = open(filename, O_CREAT);
+
+	if (stat(filename, &poem_info)) return -fprintf(stderr, "cant get stat of file\n");
+
+	*text = (char*) calloc(((size_t) poem_info.st_size  + 2), sizeof(char));
+
+	printf("stat.size_st = <%zu>\n", (size_t) poem_info.st_size);
+
+	//fread(*text, sizeof(char), 230000, poem_file);
+	read(file_descriptor, *text, poem_info.st_size);
+
+	close(file_descriptor);
+
+	
+	(*text)[poem_info.st_size] = '\0';
+	printf("We have read a file: %s\n", *text);
+
+	printf("stat.size_st = <%zu>\n", (size_t) poem_info.st_size); //<229693>
+
+	return text_beater(text, string_pointers);
+}
+
+size_t count_strings(const char* input_filename)
+{
+	FILE* file = fopen(input_filename, "r");
+	NULL_FILE_ERROR(file);
+
+	size_t count_strings = 0;
+
+	char cur_char = '\0';
+
+	while (cur_char = fgetc(file) != EOF)
+	{
+		if (cur_char == '\n') count_strings++;
+	}
+
+	fclose(file);
+
+	return count_strings;
+}
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //ФУНКЦИИ сортировок и для них
 
 
-void swap_void(void* char_aptr, void* b_ptr, size_t size_el) //Смена значений двух переменных по void указателям
+void swap_void(void* a_ptr, void* b_ptr, size_t size_el) //Смена значений двух переменных по void указателям
 {
 	void* temp = calloc(1, size_el);
 
 	for (size_t i = 0; i < size_el; i++)
 	{
-		*((char*) temp + i) = *((char*) char_aptr + i);
-		*((char*) char_aptr + i) = *((char*) b_ptr + i);
+		*((char*) temp + i) = *((char*) a_ptr + i);
+		*((char*) a_ptr + i) = *((char*) b_ptr + i);
 		*((char*) b_ptr + i) = *((char*) temp + i);
 	}
 
@@ -202,17 +288,16 @@ int quick_sort(void* array, size_t size, size_t size_el, int (*comparator) (void
 	//#DBG printf("-------------------------------------------------------\n");
 }
 
-
-
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //ФУНКЦИИ-компораторы
+
 
 int comp_alphabet_str(void* a_ptr, void* b_ptr) //Компаратор сортировки строк в алфавитном порядке (раньше в алф буква - меньше строка)
 {
 	if (a_ptr == NULL || b_ptr == NULL)
 	{
 		fprintf(stderr, "NULL PTR ERROR\n");
-		return ERROR;
+		assert(0);
 	}
 
 	char* a = *((char**) a_ptr);
@@ -225,8 +310,9 @@ int comp_alphabet_str(void* a_ptr, void* b_ptr) //Компаратор сорт�
 	{
 		//printf("a[i_a] = <%c>, b[i_b] = <%c>\n", a[i_a], b[i_b]);
 
-		while (!isalpha(a[i_a]) || isspace(a[i_a])) i_a++;
-		while (!isalpha(b[i_b]) || isspace(b[i_b])) i_b++;
+		// FIXME: out of range
+		while (!isalpha(a[i_a]) || a[i_a] != '\0') i_a++;
+		while (!isalpha(b[i_b]) || b[i_b] != '\0') i_b++;
 
 		if (tolower(a[i_a]) < tolower(b[i_b])) return LESS;
 		if (tolower(a[i_a]) > tolower(b[i_b])) return MORE;
@@ -266,7 +352,7 @@ int comp_rev_alphabet_str(void* a_ptr, void* b_ptr) //Компоратор ст�
 	i_a--;
 	i_b--;
 
-	while (i_a >= 0 || i_b >= 0)
+	while (i_a >= 0 && i_b >= 0)
 	{
 
 
@@ -297,85 +383,24 @@ int uint_comparator_up(void* a_ptr, void* b_ptr) //Компаратор указ
 }
 
 
-//----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-//ФУНКЦИИ для чтения текста
 
 
-int text_beater1(char** text_ptr, char* string_pointers[]) //Разделение всего текста  на строки и занесение в массив указателей на строки string_pointers[]
-{
-	size_t pos = 0;
-
-	int i = 0;
-
-	char* text = *text_ptr;
-
-	string_pointers[0] = text;
-
-	while ((text)[pos] != '\0' && (text)[pos] != EOF) //Идем до конца текста
-	{
-		printf("char in text in pos <%d> = <%c>\n", pos, text[pos]);
-		if (text[pos] == '\n')
-		{
-			while (isspace((text)[pos]) || (!isalpha((text)[pos]) && (text)[pos] != '`'))
-			{
-				if ((text)[pos] == '\0')
-				{
-					return i + 1;
-				}
-
-				pos++;
-			}
-
-			i++;
-			string_pointers[i] = &(text[pos]);
-
-			printf("PTR added to the str_ptrs into i = %d\n", i);
-		}
-		pos++;
-	}
-	return i + 1;
-}
-
-
-
-
-int read_text(const char* filename , FILE* poem_file, char** text, char* string_pointers[]) //Чтение текста  из исходного файла
-{
-	NULL_PTR_INP_ERROR(string_pointers);
-	EMPTY_STRING_ERROR(filename);
-
-	struct stat poem_info = {};
-
-	if (stat(filename, &poem_info)) return -fprintf(stderr, "cant get stat of file\n");
-
-	*text = (char*) calloc((poem_info.st_size + 2), sizeof(char));
-
-	fread(*text, sizeof(char), poem_info.st_size, poem_file);
-	
-	(*text)[poem_info.st_size] = '\0';
-	printf("We have read a file: %s\n", *text);;
-
-	return text_beater1(text, string_pointers);
-}
 
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //MAIN
 
-int main()
+int main(int argc, char* argv[])
 {
-
-	const char input_filename[] = "Texts\\Eugeny Onegin.txt";  //TODO = argv[1]
-	FILE* poem_file = fopen(input_filename, "r");            //Открытие файла с поэмой
-	NULL_FILE_ERROR(poem_file);
+	const char* input_filename = argv[1]; 
 
 	char* text = NULL;
 
-	size_t num_of_strings = MAX_STRINGS_NUM;     
+	size_t num_of_strings = count_strings(input_filename);     
 	char** string_pointers = (char**) calloc(num_of_strings, sizeof(char*)); //Создание массива указателей на начала строк
 
-	num_of_strings = read_text(input_filename, poem_file, &text, string_pointers);
-	fclose(poem_file);
+	num_of_strings = read_text(input_filename, &text, string_pointers);
+
 
 /*
 	printf("BEFORE CHANGING|||||||num_of_strings = <%d>\n------------------------------------------------------------------------\n", num_of_strings);
@@ -395,7 +420,7 @@ int main()
 
 
 
-	const char out_file_name[] = "Texts\\poem_out.txt"; 
+	const char* out_file_name = argv[2]; 
 
 	FILE* out_file = fopen(out_file_name, "w");
 	NULL_FILE_ERROR(out_file);
